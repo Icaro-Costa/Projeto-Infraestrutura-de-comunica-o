@@ -1,4 +1,4 @@
-# Projeto (Semana 1): Planejamento do Chat Simples
+# Projeto: Planejamento do Chat Simples
 
 ## 1. Documento de Planejamento Inicial
 
