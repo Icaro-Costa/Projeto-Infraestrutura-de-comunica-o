@@ -352,7 +352,7 @@
     let messages = [];
 
     // Objeto WebSocket
-    let ws = null; // Agora a variavel armazena a conexao real
+    let ws = null; 
 
     function updateUI() {
       // Update text content
@@ -414,62 +414,79 @@
       }
 
       const messageEl = document.createElement('div');
-      messageEl.className = `message ${isOwn ? 'own' : 'other'}`;
+      
+      // Se for uma mensagem do sistema, usa classe para centralizar
+      const isSystem = sender === 'SISTEMA' || sender === 'Sistema';
+      messageEl.className = `message ${isOwn ? 'own' : 'other'} ${isSystem ? 'system-message' : ''}`;
       
       const bubbleEl = document.createElement('div');
       bubbleEl.className = 'message-bubble';
       
-      if (!isOwn) {
+      if (!isOwn && !isSystem) {
         const senderEl = document.createElement('div');
         senderEl.className = 'message-sender';
         senderEl.textContent = sender;
         bubbleEl.appendChild(senderEl);
       }
       
+      // Funcionalidade Secundaria: Estilo simples para mensagem de sistema
+      const textContent = isSystem ? text.replace(/\*/g, '') : text; // Remove os asteriscos do sistema para nao aparecer no texto final
+      
       const textEl = document.createElement('div');
       textEl.className = 'message-text';
-      textEl.textContent = text;
+      textEl.innerHTML = isSystem ? `<em>${textContent}</em>` : textContent; // Usa <em> para italico
+      
       bubbleEl.appendChild(textEl);
+      
+      // Ajuste de estilo para mensagem de sistema
+      if (isSystem) {
+        messageEl.style.justifyContent = 'center';
+        bubbleEl.style.background = 'transparent';
+        bubbleEl.style.color = '#718096';
+        bubbleEl.style.boxShadow = 'none';
+        bubbleEl.style.maxWidth = '100%';
+        textEl.style.textAlign = 'center';
+      }
       
       messageEl.appendChild(bubbleEl);
       messagesContainer.appendChild(messageEl);
       
-      // Aplicar cores ao novo balao
-      const primaryColor = config.primary_color || defaultConfig.primary_color;
-      const secondaryColor = config.secondary_color || defaultConfig.secondary_color;
-      const surfaceColor = config.surface_color || defaultConfig.surface_color;
-      const textColor = config.text_color || defaultConfig.text_color;
-      
-      if (isOwn) {
-        bubbleEl.style.background = `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`;
-      } else {
-        bubbleEl.style.background = surfaceColor;
-        bubbleEl.style.color = textColor;
+      // Aplicar cores para mensagens normais (proprias e de outros)
+      if (!isSystem) {
+          const primaryColor = config.primary_color || defaultConfig.primary_color;
+          const secondaryColor = config.secondary_color || defaultConfig.secondary_color;
+          const surfaceColor = config.surface_color || defaultConfig.surface_color;
+          const textColor = config.text_color || defaultConfig.text_color;
+          
+          if (isOwn) {
+            bubbleEl.style.background = `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`;
+          } else {
+            bubbleEl.style.background = surfaceColor;
+            bubbleEl.style.color = textColor;
+          }
       }
       
       // Scroll to bottom
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
       
-      messages.push({ sender, text, isOwn });
+      messages.push({ sender, text, isOwn, isSystem });
     }
 
     // Funcao para lidar com mensagens recebidas (do servidor)
     function handleIncomingMessage(event) {
       try {
-        // Recebe a string JSON do servidor
-        const data = JSON.parse(event.data); 
+        const data = JSON.parse(event.data);
         const sender = data.sender || 'Servidor';
-        const text = data.text || 'Mensagem Invalida';
-        
-        // Se a mensagem nao for do usuario local, adiciona como "other"
+        const text = data.text || '';
+
+        // Adiciona a mensagem, seja ela de sistema ou de outro usuario
         const isOwn = sender === currentUsername;
-        if (!isOwn) {
+        if (!isOwn) { // Nao deve processar mensagens proprias via servidor
             addMessage(sender, text, false); 
         }
 
       } catch (e) {
         console.error('Erro ao processar mensagem do servidor:', e);
-        addMessage('ERRO', 'Mensagem Invalida', false);
       }
     }
 
@@ -490,16 +507,22 @@
       currentUsername = username;
       showStatus('Conectando...', 'connecting');
       
-      // O protocolo para WebSocket e 'ws://'
       const wsUrl = `ws://${host}:${port}`;
 
-      // Inicia a conexao WebSocket real
       try {
           ws = new WebSocket(wsUrl);
 
           // Ocorre quando a conexao e estabelecida
           ws.onopen = () => {
               console.log("Conectado ao WebSocket!");
+              
+              // 1. Funcionalidade Secundaria: Envia Handshake com Username
+              const handshakeMsg = {
+                  type: 'handshake',
+                  username: currentUsername
+              };
+              ws.send(JSON.stringify(handshakeMsg)); // Envia o nome de usuario para registro
+
               document.getElementById('userInfo').textContent = `Conectado como: ${username}`;
               showScreen('chatScreen');
           };
@@ -507,19 +530,18 @@
           // Ocorre quando uma mensagem e recebida
           ws.onmessage = handleIncomingMessage;
 
-          // Ocorre se houver um erro de conexao
+          // Tratamento de Erros: Erro de conexao
           ws.onerror = (error) => {
               console.error("Erro no WebSocket:", error);
               showStatus(`Erro ao conectar: Verifique o console.`, 'error');
-              disconnect(); // Limpa e volta para a tela de login
+              disconnect(false); // Nao tenta fechar o socket que ja falhou
           };
 
-          // Ocorre quando a conexao e fechada
+          // Tratamento de Erros: Conexao fechada
           ws.onclose = (event) => {
               console.log(`Conexao fechada. Codigo: ${event.code}, Razao: ${event.reason}`);
-              // Apenas volta para a tela de login se ja estava conectado
               if (document.getElementById('chatScreen').classList.contains('active')) {
-                   disconnect();
+                   disconnect(false); // Nao tenta fechar o socket
                    showStatus('Conexão Perdida com o Servidor.', 'error');
               } else {
                    ws = null;
@@ -538,13 +560,12 @@
       const input = document.getElementById('messageInput');
       const text = input.value.trim();
       
-      // Verifica se o WebSocket esta aberto
       if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
       
-      // Monta a mensagem como objeto JSON
+      // 2. Envia mensagem de chat (o servidor ira adicionar o nome)
       const messageObject = {
-        sender: currentUsername,
-        text: text
+          type: 'chat', 
+          text: text
       };
       
       // Envia a mensagem para o servidor
@@ -556,13 +577,13 @@
       input.value = '';
     }
     
-    // Funcao de desconexao
-    function disconnect() {
-      if (ws && ws.readyState === WebSocket.OPEN) {
+    // Funcao de desconexao (opcionalmente fecha o socket)
+    function disconnect(closeSocket = true) {
+      if (ws && closeSocket && ws.readyState === WebSocket.OPEN) {
           // Fecha a conexao de forma limpa
           ws.close(1000, "Desconexao solicitada pelo usuario");
       }
-      ws = null; // Garante que a referencia e limpa
+      ws = null; 
       currentUsername = '';
       messages = [];
       
@@ -587,7 +608,10 @@
     });
 
     // Disconnect
-    document.getElementById('disconnectButton').addEventListener('click', disconnect);
+    document.getElementById('disconnectButton').addEventListener('click', () => disconnect(true));
+
+    // Inicializa a porta padrao para 8765
+    document.getElementById('portInput').value = '8765';
     
     // Initialize Element SDK
     if (window.elementSdk) {
