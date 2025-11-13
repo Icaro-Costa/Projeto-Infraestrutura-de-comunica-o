@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="pt-BR">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simple Chat Client</title>
+  <script src="/_sdk/element_sdk.js"></script>
+  <style>
+    body {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    html {
+      height: 100%;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    .app-container {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .screen {
+      display: none;
+      height: 100%;
+      flex-direction: column;
+    }
+
+    .screen.active {
+      display: flex;
+    }
+
+    /* Login Screen Styles */
+    .login-screen {
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .login-card {
+      background: white;
+      border-radius: 16px;
+      padding: 40px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .login-title {
+      font-size: 28px;
+      font-weight: 700;
+      color: #2d3748;
+      margin: 0 0 30px 0;
+      text-align: center;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      color: #4a5568;
+      margin-bottom: 8px;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: all 0.2s;
+      outline: none;
+    }
+
+    .form-input:focus {
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .connect-button {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin-top: 10px;
+    }
+
+    .connect-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+    }
+
+    .connect-button:active {
+      transform: translateY(0);
+    }
+
+    .status-message {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      text-align: center;
+      display: none;
+    }
+
+    .status-message.error {
+      background: #fed7d7;
+      color: #c53030;
+      display: block;
+    }
+
+    .status-message.connecting {
+      background: #bee3f8;
+      color: #2c5282;
+      display: block;
+    }
+
+    /* Chat Screen Styles */
+    .chat-screen {
+      background: white;
+    }
+
+    .chat-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .chat-header-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin: 0;
+    }
+
+    .chat-header-subtitle {
+      font-size: 14px;
+      opacity: 0.9;
+      margin-top: 4px;
+    }
+
+    .disconnect-button {
+      padding: 10px 20px;
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      border: 2px solid white;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .disconnect-button:hover {
+      background: white;
+      color: #667eea;
+    }
+
+    .messages-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      background: #f7fafc;
+    }
+
+    .message {
+      margin-bottom: 16px;
+      display: flex;
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .message.own {
+      justify-content: flex-end;
+    }
+
+    .message-bubble {
+      max-width: 70%;
+      padding: 12px 16px;
+      border-radius: 16px;
+      word-wrap: break-word;
+    }
+
+    .message.other .message-bubble {
+      background: white;
+      color: #2d3748;
+      border-bottom-left-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .message.own .message-bubble {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+
+    .message-sender {
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      opacity: 0.8;
+    }
+
+    .message-text {
+      font-size: 15px;
+      line-height: 1.4;
+    }
+
+    .input-container {
+      padding: 20px;
+      background: white;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      gap: 12px;
+    }
+
+    .message-input {
+      flex: 1;
+      padding: 12px 16px;
+      border: 2px solid #e2e8f0;
+      border-radius: 24px;
+      font-size: 15px;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .message-input:focus {
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .send-button {
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 24px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .send-button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .send-button:active {
+      transform: scale(0.98);
+    }
+
+    .empty-state {
+      text-align: center;
+      color: #a0aec0;
+      padding: 40px 20px;
+      font-size: 15px;
+    }
+  </style>
+  <style>@view-transition { navigation: auto; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+  <script src="https://cdn.tailwindcss.com" type="text/javascript"></script>
+ </head>
+ <body>
+  <div class="app-container"><!-- Login Screen -->
+   <div class="screen login-screen active" id="loginScreen">
+    <div class="login-card">
+     <h1 class="login-title" id="loginTitle">Conectar ao Servidor</h1>
+     <form id="loginForm">
+      <div class="form-group"><label class="form-label" for="usernameInput">Seu Nome de Usuário</label> <input type="text" id="usernameInput" class="form-input" placeholder="Digite seu nome" required>
+      </div>
+      <div class="form-group"><label class="form-label" for="hostInput">Host do Servidor</label> <input type="text" id="hostInput" class="form-input" value="127.0.0.1" placeholder="127.0.0.1">
+      </div>
+      <div class="form-group"><label class="form-label" for="portInput">Porta</label> <input type="number" id="portInput" class="form-input" value="12345" placeholder="12345">
+      </div><button type="submit" class="connect-button" id="connectButton"> Conectar </button>
+      <div class="status-message" id="statusMessage"></div>
+     </form>
+    </div>
+   </div><!-- Chat Screen -->
+   <div class="screen chat-screen" id="chatScreen">
+    <div class="chat-header">
+     <div>
+      <h2 class="chat-header-title" id="chatTitle">Sala de Chat</h2>
+      <div class="chat-header-subtitle" id="userInfo">
+       Conectado como: Usuário
+      </div>
+     </div><button class="disconnect-button" id="disconnectButton">Desconectar</button>
+    </div>
+    <div class="messages-container" id="messagesContainer">
+     <div class="empty-state">
+      Nenhuma mensagem ainda. Seja o primeiro a enviar uma mensagem!
+     </div>
+    </div>
+    <div class="input-container"><input type="text" id="messageInput" class="message-input" placeholder="Digite sua mensagem..."> <button class="send-button" id="sendButton">Enviar</button>
+    </div>
+   </div>
+  </div>
+  <script>
+    const defaultConfig = {
+      app_title: "Chat Simples",
+      login_title: "Conectar ao Servidor",
+      connect_button_text: "Conectar",
+      chat_title: "Sala de Chat",
+      message_placeholder: "Digite sua mensagem...",
+      send_button_text: "Enviar",
+      disconnect_button_text: "Desconectar",
+      primary_color: "#667eea",
+      secondary_color: "#764ba2",
+      background_color: "#f7fafc",
+      text_color: "#2d3748",
+      surface_color: "#ffffff"
+    };
+
+    let config = { ...defaultConfig };
+    let currentUsername = '';
+    let messages = [];
+
+    // Simulate WebSocket connection (since we can't actually connect to a server in this environment)
+    let isConnected = false;
+
+    function updateUI() {
+      // Update text content
+      document.getElementById('loginTitle').textContent = config.login_title || defaultConfig.login_title;
+      document.getElementById('connectButton').textContent = config.connect_button_text || defaultConfig.connect_button_text;
+      document.getElementById('chatTitle').textContent = config.chat_title || defaultConfig.chat_title;
+      document.getElementById('messageInput').placeholder = config.message_placeholder || defaultConfig.message_placeholder;
+      document.getElementById('sendButton').textContent = config.send_button_text || defaultConfig.send_button_text;
+      document.getElementById('disconnectButton').textContent = config.disconnect_button_text || defaultConfig.disconnect_button_text;
+
+      // Update colors
+      const primaryColor = config.primary_color || defaultConfig.primary_color;
+      const secondaryColor = config.secondary_color || defaultConfig.secondary_color;
+      const backgroundColor = config.background_color || defaultConfig.background_color;
+      const textColor = config.text_color || defaultConfig.text_color;
+      const surfaceColor = config.surface_color || defaultConfig.surface_color;
+
+      document.querySelector('.app-container').style.background = `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`;
+      document.querySelector('.connect-button').style.background = `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`;
+      document.querySelector('.chat-header').style.background = `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`;
+      document.querySelector('.messages-container').style.background = backgroundColor;
+      document.querySelector('.login-card').style.background = surfaceColor;
+      document.querySelector('.login-title').style.color = textColor;
+      
+      const ownBubbles = document.querySelectorAll('.message.own .message-bubble');
+      ownBubbles.forEach(bubble => {
+        bubble.style.background = `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`;
+      });
+
+      const otherBubbles = document.querySelectorAll('.message.other .message-bubble');
+      otherBubbles.forEach(bubble => {
+        bubble.style.background = surfaceColor;
+        bubble.style.color = textColor;
+      });
+
+      document.querySelector('.send-button').style.background = `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`;
+    }
+
+    function showScreen(screenId) {
+      document.querySelectorAll('.screen').forEach(screen => {
+        screen.classList.remove('active');
+      });
+      document.getElementById(screenId).classList.add('active');
+    }
+
+    function showStatus(message, type) {
+      const statusEl = document.getElementById('statusMessage');
+      statusEl.textContent = message;
+      statusEl.className = `status-message ${type}`;
+    }
+
+    function addMessage(sender, text, isOwn) {
+      const messagesContainer = document.getElementById('messagesContainer');
+      
+      // Remove empty state if it exists
+      const emptyState = messagesContainer.querySelector('.empty-state');
+      if (emptyState) {
+        emptyState.remove();
+      }
+
+      const messageEl = document.createElement('div');
+      messageEl.className = `message ${isOwn ? 'own' : 'other'}`;
+      
+      const bubbleEl = document.createElement('div');
+      bubbleEl.className = 'message-bubble';
+      
+      if (!isOwn) {
+        const senderEl = document.createElement('div');
+        senderEl.className = 'message-sender';
+        senderEl.textContent = sender;
+        bubbleEl.appendChild(senderEl);
+      }
+      
+      const textEl = document.createElement('div');
+      textEl.className = 'message-text';
+      textEl.textContent = text;
+      bubbleEl.appendChild(textEl);
+      
+      messageEl.appendChild(bubbleEl);
+      messagesContainer.appendChild(messageEl);
+      
+      // Apply colors to new message
+      const primaryColor = config.primary_color || defaultConfig.primary_color;
+      const secondaryColor = config.secondary_color || defaultConfig.secondary_color;
+      const surfaceColor = config.surface_color || defaultConfig.surface_color;
+      const textColor = config.text_color || defaultConfig.text_color;
+      
+      if (isOwn) {
+        bubbleEl.style.background = `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`;
+      } else {
+        bubbleEl.style.background = surfaceColor;
+        bubbleEl.style.color = textColor;
+      }
+      
+      // Scroll to bottom
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      
+      messages.push({ sender, text, isOwn });
+    }
+
+    // Simulate receiving messages from other users
+    function simulateIncomingMessage() {
+      if (!isConnected) return;
+      
+      const demoUsers = ['Alice', 'Bob', 'Carol', 'David'];
+      const demoMessages = [
+        'Olá! Como estão todos?',
+        'Alguém aí?',
+        'Que legal esse chat!',
+        'Bom dia!',
+        'Tudo bem com vocês?'
+      ];
+      
+      const randomUser = demoUsers[Math.floor(Math.random() * demoUsers.length)];
+      const randomMessage = demoMessages[Math.floor(Math.random() * demoMessages.length)];
+      
+      if (randomUser !== currentUsername) {
+        addMessage(randomUser, randomMessage, false);
+      }
+    }
+
+    // Login form submission
+    document.getElementById('loginForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      
+      const username = document.getElementById('usernameInput').value.trim();
+      const host = document.getElementById('hostInput').value.trim();
+      const port = document.getElementById('portInput').value.trim();
+      
+      if (!username) {
+        showStatus('Por favor, digite seu nome de usuário', 'error');
+        return;
+      }
+      
+      showStatus('Conectando...', 'connecting');
+      
+      // Simulate connection delay
+      setTimeout(() => {
+        currentUsername = username;
+        isConnected = true;
+        
+        document.getElementById('userInfo').textContent = `Conectado como: ${username}`;
+        showScreen('chatScreen');
+        
+        // Simulate some initial messages
+        setTimeout(() => simulateIncomingMessage(), 2000);
+        setTimeout(() => simulateIncomingMessage(), 5000);
+      }, 1000);
+    });
+
+    // Send message
+    function sendMessage() {
+      const input = document.getElementById('messageInput');
+      const text = input.value.trim();
+      
+      if (!text || !isConnected) return;
+      
+      addMessage(currentUsername, text, true);
+      input.value = '';
+      
+      // Simulate response after a delay
+      setTimeout(() => simulateIncomingMessage(), Math.random() * 3000 + 2000);
+    }
+
+    document.getElementById('sendButton').addEventListener('click', sendMessage);
+    
+    document.getElementById('messageInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        sendMessage();
+      }
+    });
+
+    // Disconnect
+    document.getElementById('disconnectButton').addEventListener('click', () => {
+      isConnected = false;
+      currentUsername = '';
+      messages = [];
+      
+      // Clear messages
+      const messagesContainer = document.getElementById('messagesContainer');
+      messagesContainer.innerHTML = '<div class="empty-state">Nenhuma mensagem ainda. Seja o primeiro a enviar uma mensagem!</div>';
+      
+      // Clear form
+      document.getElementById('usernameInput').value = '';
+      document.getElementById('statusMessage').className = 'status-message';
+      
+      showScreen('loginScreen');
+    });
+
+    // Initialize Element SDK
+    if (window.elementSdk) {
+      window.elementSdk.init({
+        defaultConfig: defaultConfig,
+        onConfigChange: async (newConfig) => {
+          config = { ...newConfig };
+          updateUI();
+        },
+        mapToCapabilities: (config) => ({
+          recolorables: [
+            {
+              get: () => config.primary_color || defaultConfig.primary_color,
+              set: (value) => {
+                config.primary_color = value;
+                window.elementSdk.setConfig({ primary_color: value });
+              }
+            },
+            {
+              get: () => config.secondary_color || defaultConfig.secondary_color,
+              set: (value) => {
+                config.secondary_color = value;
+                window.elementSdk.setConfig({ secondary_color: value });
+              }
+            },
+            {
+              get: () => config.background_color || defaultConfig.background_color,
+              set: (value) => {
+                config.background_color = value;
+                window.elementSdk.setConfig({ background_color: value });
+              }
+            },
+            {
+              get: () => config.text_color || defaultConfig.text_color,
+              set: (value) => {
+                config.text_color = value;
+                window.elementSdk.setConfig({ text_color: value });
+              }
+            },
+            {
+              get: () => config.surface_color || defaultConfig.surface_color,
+              set: (value) => {
+                config.surface_color = value;
+                window.elementSdk.setConfig({ surface_color: value });
+              }
+            }
+          ],
+          borderables: [],
+          fontEditable: undefined,
+          fontSizeable: undefined
+        }),
+        mapToEditPanelValues: (config) => new Map([
+          ['app_title', config.app_title || defaultConfig.app_title],
+          ['login_title', config.login_title || defaultConfig.login_title],
+          ['connect_button_text', config.connect_button_text || defaultConfig.connect_button_text],
+          ['chat_title', config.chat_title || defaultConfig.chat_title],
+          ['message_placeholder', config.message_placeholder || defaultConfig.message_placeholder],
+          ['send_button_text', config.send_button_text || defaultConfig.send_button_text],
+          ['disconnect_button_text', config.disconnect_button_text || defaultConfig.disconnect_button_text]
+        ])
+      });
+    }
+
+    // Initial UI update
+    updateUI();
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'99a8609dd5ee4fb4',t:'MTc2MjQ3MTgxMy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
