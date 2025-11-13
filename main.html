@@ -179,6 +179,10 @@
       color: #667eea;
     }
 
+    .disconnect-button:active {
+      transform: translateY(0);
+    }
+
     .messages-container {
       flex: 1;
       overflow-y: auto;
@@ -296,8 +300,7 @@
   <script src="https://cdn.tailwindcss.com" type="text/javascript"></script>
  </head>
  <body>
-  <div class="app-container"><!-- Login Screen -->
-   <div class="screen login-screen active" id="loginScreen">
+  <div class="app-container"><div class="screen login-screen active" id="loginScreen">
     <div class="login-card">
      <h1 class="login-title" id="loginTitle">Conectar ao Servidor</h1>
      <form id="loginForm">
@@ -305,13 +308,12 @@
       </div>
       <div class="form-group"><label class="form-label" for="hostInput">Host do Servidor</label> <input type="text" id="hostInput" class="form-input" value="127.0.0.1" placeholder="127.0.0.1">
       </div>
-      <div class="form-group"><label class="form-label" for="portInput">Porta</label> <input type="number" id="portInput" class="form-input" value="12345" placeholder="12345">
+      <div class="form-group"><label class="form-label" for="portInput">Porta</label> <input type="number" id="portInput" class="form-input" value="8765" placeholder="12345">
       </div><button type="submit" class="connect-button" id="connectButton"> Conectar </button>
       <div class="status-message" id="statusMessage"></div>
      </form>
     </div>
-   </div><!-- Chat Screen -->
-   <div class="screen chat-screen" id="chatScreen">
+   </div><div class="screen chat-screen" id="chatScreen">
     <div class="chat-header">
      <div>
       <h2 class="chat-header-title" id="chatTitle">Sala de Chat</h2>
@@ -349,8 +351,8 @@
     let currentUsername = '';
     let messages = [];
 
-    // Simulate WebSocket connection (since we can't actually connect to a server in this environment)
-    let isConnected = false;
+    // Objeto WebSocket
+    let ws = null; // Agora a variavel armazena a conexao real
 
     function updateUI() {
       // Update text content
@@ -432,7 +434,7 @@
       messageEl.appendChild(bubbleEl);
       messagesContainer.appendChild(messageEl);
       
-      // Apply colors to new message
+      // Aplicar cores ao novo balao
       const primaryColor = config.primary_color || defaultConfig.primary_color;
       const secondaryColor = config.secondary_color || defaultConfig.secondary_color;
       const surfaceColor = config.surface_color || defaultConfig.surface_color;
@@ -451,26 +453,26 @@
       messages.push({ sender, text, isOwn });
     }
 
-    // Simulate receiving messages from other users
-    function simulateIncomingMessage() {
-      if (!isConnected) return;
-      
-      const demoUsers = ['Alice', 'Bob', 'Carol', 'David'];
-      const demoMessages = [
-        'Olá! Como estão todos?',
-        'Alguém aí?',
-        'Que legal esse chat!',
-        'Bom dia!',
-        'Tudo bem com vocês?'
-      ];
-      
-      const randomUser = demoUsers[Math.floor(Math.random() * demoUsers.length)];
-      const randomMessage = demoMessages[Math.floor(Math.random() * demoMessages.length)];
-      
-      if (randomUser !== currentUsername) {
-        addMessage(randomUser, randomMessage, false);
+    // Funcao para lidar com mensagens recebidas (do servidor)
+    function handleIncomingMessage(event) {
+      try {
+        // Recebe a string JSON do servidor
+        const data = JSON.parse(event.data); 
+        const sender = data.sender || 'Servidor';
+        const text = data.text || 'Mensagem Invalida';
+        
+        // Se a mensagem nao for do usuario local, adiciona como "other"
+        const isOwn = sender === currentUsername;
+        if (!isOwn) {
+            addMessage(sender, text, false); 
+        }
+
+      } catch (e) {
+        console.error('Erro ao processar mensagem do servidor:', e);
+        addMessage('ERRO', 'Mensagem Invalida', false);
       }
     }
+
 
     // Login form submission
     document.getElementById('loginForm').addEventListener('submit', (e) => {
@@ -485,20 +487,50 @@
         return;
       }
       
+      currentUsername = username;
       showStatus('Conectando...', 'connecting');
       
-      // Simulate connection delay
-      setTimeout(() => {
-        currentUsername = username;
-        isConnected = true;
-        
-        document.getElementById('userInfo').textContent = `Conectado como: ${username}`;
-        showScreen('chatScreen');
-        
-        // Simulate some initial messages
-        setTimeout(() => simulateIncomingMessage(), 2000);
-        setTimeout(() => simulateIncomingMessage(), 5000);
-      }, 1000);
+      // O protocolo para WebSocket e 'ws://'
+      const wsUrl = `ws://${host}:${port}`;
+
+      // Inicia a conexao WebSocket real
+      try {
+          ws = new WebSocket(wsUrl);
+
+          // Ocorre quando a conexao e estabelecida
+          ws.onopen = () => {
+              console.log("Conectado ao WebSocket!");
+              document.getElementById('userInfo').textContent = `Conectado como: ${username}`;
+              showScreen('chatScreen');
+          };
+
+          // Ocorre quando uma mensagem e recebida
+          ws.onmessage = handleIncomingMessage;
+
+          // Ocorre se houver um erro de conexao
+          ws.onerror = (error) => {
+              console.error("Erro no WebSocket:", error);
+              showStatus(`Erro ao conectar: Verifique o console.`, 'error');
+              disconnect(); // Limpa e volta para a tela de login
+          };
+
+          // Ocorre quando a conexao e fechada
+          ws.onclose = (event) => {
+              console.log(`Conexao fechada. Codigo: ${event.code}, Razao: ${event.reason}`);
+              // Apenas volta para a tela de login se ja estava conectado
+              if (document.getElementById('chatScreen').classList.contains('active')) {
+                   disconnect();
+                   showStatus('Conexão Perdida com o Servidor.', 'error');
+              } else {
+                   ws = null;
+              }
+          };
+
+      } catch (error) {
+          console.error("Erro ao tentar criar WebSocket:", error);
+          showStatus('Erro: Verifique o endereço do servidor.', 'error');
+          ws = null;
+      }
     });
 
     // Send message
@@ -506,14 +538,45 @@
       const input = document.getElementById('messageInput');
       const text = input.value.trim();
       
-      if (!text || !isConnected) return;
+      // Verifica se o WebSocket esta aberto
+      if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
       
-      addMessage(currentUsername, text, true);
+      // Monta a mensagem como objeto JSON
+      const messageObject = {
+        sender: currentUsername,
+        text: text
+      };
+      
+      // Envia a mensagem para o servidor
+      ws.send(JSON.stringify(messageObject));
+
+      // Adiciona a mensagem localmente
+      addMessage(currentUsername, text, true); 
+      
       input.value = '';
-      
-      // Simulate response after a delay
-      setTimeout(() => simulateIncomingMessage(), Math.random() * 3000 + 2000);
     }
+    
+    // Funcao de desconexao
+    function disconnect() {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+          // Fecha a conexao de forma limpa
+          ws.close(1000, "Desconexao solicitada pelo usuario");
+      }
+      ws = null; // Garante que a referencia e limpa
+      currentUsername = '';
+      messages = [];
+      
+      // Limpa as mensagens
+      const messagesContainer = document.getElementById('messagesContainer');
+      messagesContainer.innerHTML = '<div class="empty-state">Nenhuma mensagem ainda. Seja o primeiro a enviar uma mensagem!</div>';
+      
+      // Limpa o formulario
+      document.getElementById('usernameInput').value = '';
+      document.getElementById('statusMessage').className = 'status-message';
+      
+      showScreen('loginScreen');
+    }
+
 
     document.getElementById('sendButton').addEventListener('click', sendMessage);
     
@@ -524,22 +587,8 @@
     });
 
     // Disconnect
-    document.getElementById('disconnectButton').addEventListener('click', () => {
-      isConnected = false;
-      currentUsername = '';
-      messages = [];
-      
-      // Clear messages
-      const messagesContainer = document.getElementById('messagesContainer');
-      messagesContainer.innerHTML = '<div class="empty-state">Nenhuma mensagem ainda. Seja o primeiro a enviar uma mensagem!</div>';
-      
-      // Clear form
-      document.getElementById('usernameInput').value = '';
-      document.getElementById('statusMessage').className = 'status-message';
-      
-      showScreen('loginScreen');
-    });
-
+    document.getElementById('disconnectButton').addEventListener('click', disconnect);
+    
     // Initialize Element SDK
     if (window.elementSdk) {
       window.elementSdk.init({
