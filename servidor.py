@@ -1,65 +1,72 @@
-# Importa bibliotecas de conexao e threads
-import socket
-import threading
+# Importa bibliotecas assincronas e de websocket
+import asyncio
+import websockets
+import json
 
-HOST = '127.0.0.1' 
-PORTA = 12345
+# Set para armazenar conexoes de clientes (WebSockets)
+clientes = set()
 
-# Lista para armazenar conexoes de clientes
-clientes = []
+# Funcao para enviar mensagem a todos os clientes
+async def broadcast(mensagem, websocket_origem):
+    # Converte a mensagem em string JSON para envio
+    msg_json = json.dumps(mensagem)
+    # Cria lista de tarefas de envio assincrono
+    tarefas_envio = []
+    
+    for websocket in clientes:
+        # Nao envia de volta para quem enviou
+        if websocket != websocket_origem:
+            tarefas_envio.append(websocket.send(msg_json))
+    
+    # Executa os envios em paralelo
+    if tarefas_envio:
+        await asyncio.gather(*tarefas_envio)
 
-# Funcao para lidar com cada cliente conectado
-def handle_client(conn, ender):
-    print(f"[NOVA CONEXAO] {ender} conectado.")
-    clientes.append(conn)
+# Funcao principal para lidar com cada conexao de cliente
+async def handler(websocket, path):
+    clientes.add(websocket) # Adiciona novo cliente
+    print(f"[NOVA CONEXAO] Cliente conectado ({len(clientes)} total).")
     
     try:
-        while True:
-            # Recebe mensagem do cliente
-            mensagem = conn.recv(1024)
-            if not mensagem:
-                break
-            
-            # Reenvia a mensagem para todos os outros clientes
-            broadcast(mensagem, conn)
-    
-    except ConnectionResetError:
-        print(f"[DESCONECTADO] {ender} desconectou abruptamente.")
-    
-    finally:
-        # Limpa a conexao
-        if conn in clientes:
-            clientes.remove(conn)
-        conn.close()
-        print(f"[CONEXAO FECHADA] {ender}.")
-
-# Funcao para enviar mensagem a todos
-def broadcast(mensagem, conexao_origem):
-    for cliente_conn in clientes:
-        # Nao envia a mensagem de volta para quem enviou
-        if cliente_conn != conexao_origem:
+        # Loop para receber mensagens do cliente
+        async for mensagem_raw in websocket:
+            # Espera que a mensagem seja um JSON: {"sender": "Nome", "text": "Mensagem"}
             try:
-                cliente_conn.send(mensagem)
-            except socket.error:
-                # Remove o cliente se houver erro ao enviar
-                if cliente_conn in clientes:
-                    clientes.remove(cliente_conn)
-                cliente_conn.close()
+                data = json.loads(mensagem_raw)
+                sender = data.get("sender", "Desconhecido")
+                text = data.get("text", "")
+                
+                if text:
+                    mensagem_broadcast = {"sender": sender, "text": text}
+                    await broadcast(mensagem_broadcast, websocket)
+                    print(f"[{sender}] {text}")
+                    
+            except json.JSONDecodeError:
+                print(f"[ERRO] Mensagem invalida recebida: {mensagem_raw}")
+
+    except websockets.exceptions.ConnectionClosedOK:
+        print(f"[DESCONECTADO] Cliente desconectou normalmente.")
+    except Exception as e:
+        print(f"[ERRO] Erro na conexao: {e}")
+    finally:
+        # Remove a conexao ao desconectar
+        if websocket in clientes:
+            clientes.remove(websocket)
+        print(f"[CONEXAO FECHADA] Cliente desconectou ({len(clientes)} restantes).")
 
 # Funcao principal do servidor
-def iniciar_servidor():
-    servidor = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    servidor.bind((HOST, PORTA))
-    servidor.listen()
-    print(f"[ESCUTANDO] Servidor escutando em {HOST}:{PORTA}...")
-
-    while True:
-        # Aceita novas conexoes
-        conn, ender = servidor.accept()
-        
-        # Cria uma nova thread para cada cliente
-        thread_cliente = threading.Thread(target=handle_client, args=(conn, ender))
-        thread_cliente.start()
+async def iniciar_servidor():
+    HOST = '127.0.0.1' 
+    PORTA = 8765 # Porta padrao para websockets
+    
+    # Inicia o servidor websocket
+    async with websockets.serve(handler, HOST, PORTA):
+        print(f"[ESCUTANDO] Servidor WebSocket escutando em ws://{HOST}:{PORTA}...")
+        # Mantem o servidor rodando para sempre
+        await asyncio.Future()
 
 if __name__ == "__main__":
-    iniciar_servidor()
+    try:
+        asyncio.run(iniciar_servidor())
+    except KeyboardInterrupt:
+        print("\nServidor encerrado.")
