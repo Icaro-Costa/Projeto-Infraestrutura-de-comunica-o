@@ -308,7 +308,7 @@
       </div>
       <div class="form-group"><label class="form-label" for="hostInput">Host do Servidor</label> <input type="text" id="hostInput" class="form-input" value="127.0.0.1" placeholder="127.0.0.1">
       </div>
-      <div class="form-group"><label class="form-label" for="portInput">Porta</label> <input type="number" id="portInput" class="form-input" value="8765" placeholder="12345">
+      <div class="form-group"><label class="form-label" for="portInput">Porta</label> <input type="number" id="portInput" class="form-input" value="9000" placeholder="12345">
       </div><button type="submit" class="connect-button" id="connectButton"> Conectar </button>
       <div class="status-message" id="statusMessage"></div>
      </form>
@@ -610,8 +610,8 @@
     // Disconnect
     document.getElementById('disconnectButton').addEventListener('click', () => disconnect(true));
 
-    // Inicializa a porta padrao para 8765
-    document.getElementById('portInput').value = '8765';
+    // Inicializa a porta padrao para 9000
+    document.getElementById('portInput').value = '9000';
     
     // Initialize Element SDK
     if (window.elementSdk) {

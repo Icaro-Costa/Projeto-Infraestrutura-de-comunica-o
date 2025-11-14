@@ -28,7 +28,7 @@ async def broadcast(mensagem, websocket_origem=None):
 
 
 # Funcao principal para lidar com cada conexao de cliente
-async def handler(websocket, path):
+async def handler(websocket):
     username = "Desconhecido"
 
     try:
