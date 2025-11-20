@@ -1,71 +1,108 @@
-# Importa bibliotecas de conexao e threads
-import socket
-import threading
+import asyncio
+import websockets
+import json
 import sys
+import threading
 
-HOST = '127.0.0.1' 
-PORTA = 12345
+# Configurações do Servidor
+HOST = '127.0.0.1'
+PORTA = 9000 # Porta do servidor WebSocket (verifique servidor.py)
+URI = f"ws://{HOST}:{PORTA}"
 
-# Funcao para receber mensagens do servidor
-def receber_mensagens(cliente_socket):
-    while True:
-        try:
-            mensagem = cliente_socket.recv(1024).decode('utf-8')
-            if not mensagem:
-                print("\n[SERVIDOR] Servidor fechou a conexao.")
-                break
-            print(f"\nMensagem recebida: {mensagem}")
-        
-        except ConnectionResetError:
-            print("\n[ERRO] Conexao perdida com o servidor.")
-            break
-        except Exception as e:
-            print(f"Erro ao receber: {e}")
-            break
-    
-    cliente_socket.close()
-
-# Funcao para enviar mensagens ao servidor
-def enviar_mensagens(cliente_socket):
-    while True:
-        try:
-            # Le input do usuario
-            mensagem = input()
-            if mensagem.lower() == 'sair':
-                break
+async def receber_mensagens(websocket):
+    """
+    Corrotina para receber mensagens do servidor.
+    """
+    try:
+        async for message in websocket:
+            try:
+                data = json.loads(message)
+                sender = data.get("sender", "Desconhecido")
+                text = data.get("text", "")
                 
-            cliente_socket.send(mensagem.encode('utf-8'))
+                # Formata a mensagem para exibição
+                if sender == "SISTEMA":
+                    print(f"\n[SISTEMA] {text}")
+                else:
+                    print(f"\n[{sender}] {text}")
+                    
+                # Re-imprime o prompt para o usuário não se perder
+                print("> ", end="", flush=True)
+                
+            except json.JSONDecodeError:
+                print(f"\n[ERRO] Mensagem inválida recebida: {message}")
+    except websockets.exceptions.ConnectionClosed:
+        print("\n[DESCONECTADO] Conexão fechada pelo servidor.")
+        sys.exit()
+    except Exception as e:
+        print(f"\n[ERRO] Erro na recepção: {e}")
+        sys.exit()
+
+async def enviar_mensagens(websocket, username):
+    """
+    Corrotina para ler input do usuário e enviar para o servidor.
+    Usa run_in_executor para não bloquear o loop de eventos com input().
+    """
+    loop = asyncio.get_running_loop()
+    
+    print(f"Conectado como {username}. Digite suas mensagens (ou 'sair' para fechar).")
+    print("> ", end="", flush=True)
+
+    while True:
+        # Executa input() em uma thread separada para não bloquear o asyncio
+        mensagem = await loop.run_in_executor(None, input)
         
-        except (EOFError, KeyboardInterrupt):
-            print("\nSaindo...")
-            break
-        except Exception as e:
-            print(f"Erro ao enviar: {e}")
+        if mensagem.strip().lower() == 'sair':
+            print("Saindo...")
+            await websocket.close()
             break
             
-    cliente_socket.close()
-    sys.exit() # Forca o encerramento do programa
+        if mensagem.strip():
+            payload = {
+                "type": "chat",
+                "text": mensagem
+            }
+            await websocket.send(json.dumps(payload))
+            print("> ", end="", flush=True)
 
-# --- Main ---
-cliente = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+async def main():
+    print(f"Tentando conectar a {URI}...")
+    try:
+        async with websockets.connect(URI) as websocket:
+            print("Conexão estabelecida!")
+            
+            # 1. Handshake
+            username = input("Digite seu nome de usuário: ").strip()
+            while not username:
+                 username = input("Nome inválido. Digite seu nome de usuário: ").strip()
 
-try:
-    cliente.connect((HOST, PORTA))
-    print(f"Conectado ao servidor em {HOST}:{PORTA}. Digite 'sair' para fechar.")
-    
-    # Inicia thread para receber mensagens
-    thread_receber = threading.Thread(target=receber_mensagens, args=(cliente,))
-    thread_receber.daemon = True # Permite fechar o programa
-    thread_receber.start()
+            handshake = {
+                "type": "handshake",
+                "username": username
+            }
+            await websocket.send(json.dumps(handshake))
+            
+            # Cria as tarefas de enviar e receber
+            task_receber = asyncio.create_task(receber_mensagens(websocket))
+            task_enviar = asyncio.create_task(enviar_mensagens(websocket, username))
+            
+            # Aguarda que uma das tarefas termine (geralmente enviar termina com 'sair')
+            done, pending = await asyncio.wait(
+                [task_receber, task_enviar],
+                return_when=asyncio.FIRST_COMPLETED
+            )
+            
+            # Cancela a tarefa pendente (se enviar terminou, cancela receber)
+            for task in pending:
+                task.cancel()
+                
+    except ConnectionRefusedError:
+        print(f"Não foi possível conectar a {URI}. O servidor está rodando?")
+    except Exception as e:
+        print(f"Erro: {e}")
 
-    # Inicia loop principal para enviar mensagens
-    enviar_mensagens(cliente)
-
-except ConnectionRefusedError:
-    print("O servidor nao esta online ou recusou a conexao.")
-except Exception as e:
-    print(f"Erro ao conectar: {e}")
-finally:
-    if cliente.fileno() != -1: # Verifica se o socket ainda esta aberto
-        cliente.close()
-    print("Conexao fechada.")
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nPrograma encerrado.")

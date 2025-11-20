@@ -1,101 +1,80 @@
 import unittest
-import socket
-from unittest.mock import patch, MagicMock
+import asyncio
+from unittest.mock import patch, MagicMock, AsyncMock
+import json
 
-# Importar as funcoes ou classes dos seus scripts originais
-# (Para este exemplo, vamos simular o fluxo principal dos scripts originais)
+class TestRedeWebSocket(unittest.IsolatedAsyncioTestCase):
 
-class TestRedeBasica(unittest.TestCase):
-
-    # Teste para o fluxo do servidor original
-    @patch('socket.socket') # Simula a biblioteca socket
-    def test_servidor_fluxo_basico(self, mock_socket_class):
-        # Configura os mocks (simuladores)
-        mock_servidor = MagicMock()
-        mock_conn = MagicMock()
-        mock_ender = ('127.0.0.1', 54321)
-
-        # Configura o mock da classe socket para retornar o mock do servidor
-        mock_socket_class.return_value = mock_servidor
-        
-        # Simula o aceite da conexao
-        mock_servidor.accept.return_value = (mock_conn, mock_ender)
-
-        # --- Simula a execucao do servidor.py original ---
-        HOST_ORIGINAL = '127.0.0.1' 
-        PORTA_ORIGINAL = 12345
-
-        # Simula a criacao do socket
-        servidor_simulado = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        
-        # Verifica se o bind e listen foram chamados (como no original)
-        servidor_simulado.bind((HOST_ORIGINAL, PORTA_ORIGINAL))
-        servidor_simulado.listen()
-        
-        # Simula a aceitacao
-        conn_simulada, ender_simulado = servidor_simulado.accept()
-        
-        # Simula o envio de mensagem
-        mensagem_enviada = "Conectado ao servidor!".encode('utf-8')
-        conn_simulada.send(mensagem_enviada)
-        
-        # Simula o fechamento
-        conn_simulada.close()
-        servidor_simulado.close()
-        # --- Fim da simulacao ---
-
-        # Verificacoes (Assertions)
-        # Verifica se os metodos corretos foram chamados nos mocks
-        mock_socket_class.assert_called_with(socket.AF_INET, socket.SOCK_STREAM)
-        mock_servidor.bind.assert_called_with((HOST_ORIGINAL, PORTA_ORIGINAL))
-        mock_servidor.listen.assert_called_once()
-        mock_servidor.accept.assert_called_once()
-        
-        # Verifica se a mensagem de boas-vindas foi enviada
-        mock_conn.send.assert_called_with(mensagem_enviada)
-        
-        # Verifica se as conexoes foram fechadas
-        mock_conn.close.assert_called_once()
-        mock_servidor.close.assert_called_once()
-
-    # Teste para o fluxo do cliente original
-    @patch('socket.socket') # Simula a biblioteca socket
-    def test_cliente_fluxo_basico(self, mock_socket_class):
-        # Configura os mocks
-        mock_cliente = MagicMock()
-        mock_socket_class.return_value = mock_cliente
-        
-        # Mensagem que o servidor (simulado) enviara
-        mensagem_servidor = "Conectado ao servidor!".encode('utf-8')
-        mock_cliente.recv.return_value = mensagem_servidor
-
-        # --- Simula a execucao do cliente.py original ---
-        HOST_ORIGINAL = '127.0.0.1' 
-        PORTA_ORIGINAL = 12345
-        
-        cliente_simulado = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        
+    # Teste para o fluxo do servidor (mantido similar, mas adaptado se necessario)
+    # Como o servidor usa websockets, o teste idealmente usaria AsyncMock
+    @patch('websockets.serve')
+    async def test_servidor_inicio(self, mock_serve):
+        # Importa aqui para evitar erro se nao tiver as libs
         try:
-            cliente_simulado.connect((HOST_ORIGINAL, PORTA_ORIGINAL))
-            mensagem_recebida = cliente_simulado.recv(1024)
-        except Exception:
-            pass # Ignora erros na simulacao
-            
-        cliente_simulado.close()
-        # --- Fim da simulacao ---
+            from servidor import iniciar_servidor
+        except ImportError:
+            self.skipTest("servidor.py nao encontrado ou com erro de importacao")
 
-        # Verificacoes (Assertions)
-        mock_socket_class.assert_called_with(socket.AF_INET, socket.SOCK_STREAM)
-        mock_cliente.connect.assert_called_with((HOST_ORIGINAL, PORTA_ORIGINAL))
+        # Mock do serve para nao travar
+        mock_serve.return_value.__aenter__.return_value = MagicMock()
         
-        # Verifica se o cliente tentou receber dados
-        mock_cliente.recv.assert_called_with(1024)
+        # Executa a funcao (vai rodar e parar no await Future se nao mockarmos o Future)
+        # Para teste simples, apenas verificamos se chamou o serve
+        with patch('asyncio.Future', new_callable=AsyncMock) as mock_future:
+            # Faz o future retornar imediatamente para nao travar o teste
+            mock_future.return_value = None 
+            
+            try:
+                await iniciar_servidor()
+            except Exception:
+                pass # Ignora erros de cancelamento ou parada forçada
+
+            # Verifica se tentou iniciar o servidor na porta 9000
+            args, _ = mock_serve.call_args
+            self.assertEqual(args[1], '127.0.0.1')
+            self.assertEqual(args[2], 9000)
+
+    # Teste para o fluxo do cliente (NOVO)
+    @patch('websockets.connect')
+    @patch('builtins.input')
+    async def test_cliente_fluxo_basico(self, mock_input, mock_connect):
+        # Importa o main do cliente
+        try:
+            from cliente import main
+        except ImportError:
+            self.skipTest("cliente.py nao encontrado ou com erro de importacao")
+
+        # Configura inputs do usuario: Username -> Mensagem -> Sair
+        mock_input.side_effect = ["Tester", "Ola Mundo", "sair"]
+
+        # Configura o Mock do WebSocket
+        mock_ws = AsyncMock()
+        mock_connect.return_value.__aenter__.return_value = mock_ws
         
-        # Verifica se o cliente decodificou corretamente (implicitamente)
-        self.assertEqual(mensagem_recebida.decode('utf-8'), "Conectado ao servidor!")
-        
-        # Verifica se o cliente fechou a conexao
-        mock_cliente.close.assert_called_once()
+        # Simula recebimento de mensagens (async generator)
+        # O cliente espera mensagens. Vamos simular uma mensagem de boas vindas e depois nada
+        async def message_generator():
+            yield json.dumps({"sender": "SISTEMA", "text": "Bem vindo"})
+            # Fica "esperando" (na pratica o teste vai acabar quando o input mandar sair)
+            while True:
+                await asyncio.sleep(0.1)
+
+        mock_ws.__aiter__.side_effect = message_generator
+
+        # Executa o cliente
+        await main()
+
+        # Verificacoes
+        # 1. Verifica se conectou na URI correta
+        mock_connect.assert_called_with("ws://127.0.0.1:9000")
+
+        # 2. Verifica se enviou o handshake
+        expected_handshake = json.dumps({"type": "handshake", "username": "Tester"})
+        mock_ws.send.assert_any_call(expected_handshake)
+
+        # 3. Verifica se enviou a mensagem de chat
+        expected_chat = json.dumps({"type": "chat", "text": "Ola Mundo"})
+        mock_ws.send.assert_any_call(expected_chat)
 
 if __name__ == '__main__':
     unittest.main()
