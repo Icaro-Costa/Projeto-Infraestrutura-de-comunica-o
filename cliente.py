@@ -33,10 +33,10 @@ async def receber_mensagens(websocket):
                 print(f"\n[ERRO] Mensagem inválida recebida: {message}")
     except websockets.exceptions.ConnectionClosed:
         print("\n[DESCONECTADO] Conexão fechada pelo servidor.")
-        sys.exit()
+        return # Retorna para encerrar a task graciosamente
     except Exception as e:
         print(f"\n[ERRO] Erro na recepção: {e}")
-        sys.exit()
+        return
 
 async def enviar_mensagens(websocket, username):
     """

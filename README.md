@@ -63,8 +63,17 @@ Basta abrir o arquivo `main.html` no seu navegador preferido (Chrome, Firefox, S
 
 ## 🧪 Testes
 
-Para verificar se tudo está funcionando corretamente, você pode rodar os testes automatizados:
+O projeto conta com uma suíte de testes automatizados para garantir a estabilidade da comunicação.
+
+### O que é testado?
+- **Conexão do Cliente**: Verifica se o cliente consegue conectar ao servidor.
+- **Handshake**: Valida o protocolo de entrada e identificação do usuário.
+- **Broadcast**: Garante que mensagens enviadas por um usuário chegam aos outros.
+- **Desconexão**: Testa se o cliente e servidor lidam corretamente com quedas de conexão.
+
+### Como rodar os testes
+Para verificar se tudo está funcionando corretamente, execute:
 
 ```bash
-python3 test_conexao.py
+python3 -m unittest test_conexao.py
 ```
