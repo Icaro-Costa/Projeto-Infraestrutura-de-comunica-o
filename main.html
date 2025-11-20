@@ -1,10 +1,11 @@
 <!doctype html>
 <html lang="pt-BR">
- <head>
+
+<head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Simple Chat Client</title>
-  <script src="/_sdk/element_sdk.js"></script>
+
   <style>
     body {
       box-sizing: border-box;
@@ -201,6 +202,7 @@
         opacity: 0;
         transform: translateY(10px);
       }
+
       to {
         opacity: 1;
         transform: translateY(0);
@@ -295,41 +297,52 @@
       font-size: 15px;
     }
   </style>
-  <style>@view-transition { navigation: auto; }</style>
-  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+  <style>
+    @view-transition {
+      navigation: auto;
+    }
+  </style>
+
   <script src="https://cdn.tailwindcss.com" type="text/javascript"></script>
- </head>
- <body>
-  <div class="app-container"><div class="screen login-screen active" id="loginScreen">
-    <div class="login-card">
-     <h1 class="login-title" id="loginTitle">Conectar ao Servidor</h1>
-     <form id="loginForm">
-      <div class="form-group"><label class="form-label" for="usernameInput">Seu Nome de Usuário</label> <input type="text" id="usernameInput" class="form-input" placeholder="Digite seu nome" required>
+</head>
+
+<body>
+  <div class="app-container">
+    <div class="screen login-screen active" id="loginScreen">
+      <div class="login-card">
+        <h1 class="login-title" id="loginTitle">Conectar ao Servidor</h1>
+        <form id="loginForm">
+          <div class="form-group"><label class="form-label" for="usernameInput">Seu Nome de Usuário</label> <input
+              type="text" id="usernameInput" class="form-input" placeholder="Digite seu nome" required>
+          </div>
+          <div class="form-group"><label class="form-label" for="hostInput">Host do Servidor</label> <input type="text"
+              id="hostInput" class="form-input" value="127.0.0.1" placeholder="127.0.0.1">
+          </div>
+          <div class="form-group"><label class="form-label" for="portInput">Porta</label> <input type="number"
+              id="portInput" class="form-input" value="9000" placeholder="12345">
+          </div><button type="submit" class="connect-button" id="connectButton"> Conectar </button>
+          <div class="status-message" id="statusMessage"></div>
+        </form>
       </div>
-      <div class="form-group"><label class="form-label" for="hostInput">Host do Servidor</label> <input type="text" id="hostInput" class="form-input" value="127.0.0.1" placeholder="127.0.0.1">
+    </div>
+    <div class="screen chat-screen" id="chatScreen">
+      <div class="chat-header">
+        <div>
+          <h2 class="chat-header-title" id="chatTitle">Sala de Chat</h2>
+          <div class="chat-header-subtitle" id="userInfo">
+            Conectado como: Usuário
+          </div>
+        </div><button class="disconnect-button" id="disconnectButton">Desconectar</button>
       </div>
-      <div class="form-group"><label class="form-label" for="portInput">Porta</label> <input type="number" id="portInput" class="form-input" value="9000" placeholder="12345">
-      </div><button type="submit" class="connect-button" id="connectButton"> Conectar </button>
-      <div class="status-message" id="statusMessage"></div>
-     </form>
-    </div>
-   </div><div class="screen chat-screen" id="chatScreen">
-    <div class="chat-header">
-     <div>
-      <h2 class="chat-header-title" id="chatTitle">Sala de Chat</h2>
-      <div class="chat-header-subtitle" id="userInfo">
-       Conectado como: Usuário
+      <div class="messages-container" id="messagesContainer">
+        <div class="empty-state">
+          Nenhuma mensagem ainda. Seja o primeiro a enviar uma mensagem!
+        </div>
       </div>
-     </div><button class="disconnect-button" id="disconnectButton">Desconectar</button>
+      <div class="input-container"><input type="text" id="messageInput" class="message-input"
+          placeholder="Digite sua mensagem..."> <button class="send-button" id="sendButton">Enviar</button>
+      </div>
     </div>
-    <div class="messages-container" id="messagesContainer">
-     <div class="empty-state">
-      Nenhuma mensagem ainda. Seja o primeiro a enviar uma mensagem!
-     </div>
-    </div>
-    <div class="input-container"><input type="text" id="messageInput" class="message-input" placeholder="Digite sua mensagem..."> <button class="send-button" id="sendButton">Enviar</button>
-    </div>
-   </div>
   </div>
   <script>
     const defaultConfig = {
@@ -352,7 +365,7 @@
     let messages = [];
 
     // Objeto WebSocket
-    let ws = null; 
+    let ws = null;
 
     function updateUI() {
       // Update text content
@@ -376,7 +389,7 @@
       document.querySelector('.messages-container').style.background = backgroundColor;
       document.querySelector('.login-card').style.background = surfaceColor;
       document.querySelector('.login-title').style.color = textColor;
-      
+
       const ownBubbles = document.querySelectorAll('.message.own .message-bubble');
       ownBubbles.forEach(bubble => {
         bubble.style.background = `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`;
@@ -406,7 +419,7 @@
 
     function addMessage(sender, text, isOwn) {
       const messagesContainer = document.getElementById('messagesContainer');
-      
+
       // Remove empty state if it exists
       const emptyState = messagesContainer.querySelector('.empty-state');
       if (emptyState) {
@@ -414,30 +427,30 @@
       }
 
       const messageEl = document.createElement('div');
-      
+
       // Se for uma mensagem do sistema, usa classe para centralizar
       const isSystem = sender === 'SISTEMA' || sender === 'Sistema';
       messageEl.className = `message ${isOwn ? 'own' : 'other'} ${isSystem ? 'system-message' : ''}`;
-      
+
       const bubbleEl = document.createElement('div');
       bubbleEl.className = 'message-bubble';
-      
+
       if (!isOwn && !isSystem) {
         const senderEl = document.createElement('div');
         senderEl.className = 'message-sender';
         senderEl.textContent = sender;
         bubbleEl.appendChild(senderEl);
       }
-      
+
       // Funcionalidade Secundaria: Estilo simples para mensagem de sistema
       const textContent = isSystem ? text.replace(/\*/g, '') : text; // Remove os asteriscos do sistema para nao aparecer no texto final
-      
+
       const textEl = document.createElement('div');
       textEl.className = 'message-text';
       textEl.innerHTML = isSystem ? `<em>${textContent}</em>` : textContent; // Usa <em> para italico
-      
+
       bubbleEl.appendChild(textEl);
-      
+
       // Ajuste de estilo para mensagem de sistema
       if (isSystem) {
         messageEl.style.justifyContent = 'center';
@@ -447,28 +460,28 @@
         bubbleEl.style.maxWidth = '100%';
         textEl.style.textAlign = 'center';
       }
-      
+
       messageEl.appendChild(bubbleEl);
       messagesContainer.appendChild(messageEl);
-      
+
       // Aplicar cores para mensagens normais (proprias e de outros)
       if (!isSystem) {
-          const primaryColor = config.primary_color || defaultConfig.primary_color;
-          const secondaryColor = config.secondary_color || defaultConfig.secondary_color;
-          const surfaceColor = config.surface_color || defaultConfig.surface_color;
-          const textColor = config.text_color || defaultConfig.text_color;
-          
-          if (isOwn) {
-            bubbleEl.style.background = `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`;
-          } else {
-            bubbleEl.style.background = surfaceColor;
-            bubbleEl.style.color = textColor;
-          }
+        const primaryColor = config.primary_color || defaultConfig.primary_color;
+        const secondaryColor = config.secondary_color || defaultConfig.secondary_color;
+        const surfaceColor = config.surface_color || defaultConfig.surface_color;
+        const textColor = config.text_color || defaultConfig.text_color;
+
+        if (isOwn) {
+          bubbleEl.style.background = `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`;
+        } else {
+          bubbleEl.style.background = surfaceColor;
+          bubbleEl.style.color = textColor;
+        }
       }
-      
+
       // Scroll to bottom
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
-      
+
       messages.push({ sender, text, isOwn, isSystem });
     }
 
@@ -482,7 +495,7 @@
         // Adiciona a mensagem, seja ela de sistema ou de outro usuario
         const isOwn = sender === currentUsername;
         if (!isOwn) { // Nao deve processar mensagens proprias via servidor
-            addMessage(sender, text, false); 
+          addMessage(sender, text, false);
         }
 
       } catch (e) {
@@ -494,64 +507,64 @@
     // Login form submission
     document.getElementById('loginForm').addEventListener('submit', (e) => {
       e.preventDefault();
-      
+
       const username = document.getElementById('usernameInput').value.trim();
       const host = document.getElementById('hostInput').value.trim();
       const port = document.getElementById('portInput').value.trim();
-      
+
       if (!username) {
         showStatus('Por favor, digite seu nome de usuário', 'error');
         return;
       }
-      
+
       currentUsername = username;
       showStatus('Conectando...', 'connecting');
-      
+
       const wsUrl = `ws://${host}:${port}`;
 
       try {
-          ws = new WebSocket(wsUrl);
+        ws = new WebSocket(wsUrl);
 
-          // Ocorre quando a conexao e estabelecida
-          ws.onopen = () => {
-              console.log("Conectado ao WebSocket!");
-              
-              // 1. Funcionalidade Secundaria: Envia Handshake com Username
-              const handshakeMsg = {
-                  type: 'handshake',
-                  username: currentUsername
-              };
-              ws.send(JSON.stringify(handshakeMsg)); // Envia o nome de usuario para registro
+        // Ocorre quando a conexao e estabelecida
+        ws.onopen = () => {
+          console.log("Conectado ao WebSocket!");
 
-              document.getElementById('userInfo').textContent = `Conectado como: ${username}`;
-              showScreen('chatScreen');
+          // 1. Funcionalidade Secundaria: Envia Handshake com Username
+          const handshakeMsg = {
+            type: 'handshake',
+            username: currentUsername
           };
+          ws.send(JSON.stringify(handshakeMsg)); // Envia o nome de usuario para registro
 
-          // Ocorre quando uma mensagem e recebida
-          ws.onmessage = handleIncomingMessage;
+          document.getElementById('userInfo').textContent = `Conectado como: ${username}`;
+          showScreen('chatScreen');
+        };
 
-          // Tratamento de Erros: Erro de conexao
-          ws.onerror = (error) => {
-              console.error("Erro no WebSocket:", error);
-              showStatus(`Erro ao conectar: Verifique o console.`, 'error');
-              disconnect(false); // Nao tenta fechar o socket que ja falhou
-          };
+        // Ocorre quando uma mensagem e recebida
+        ws.onmessage = handleIncomingMessage;
 
-          // Tratamento de Erros: Conexao fechada
-          ws.onclose = (event) => {
-              console.log(`Conexao fechada. Codigo: ${event.code}, Razao: ${event.reason}`);
-              if (document.getElementById('chatScreen').classList.contains('active')) {
-                   disconnect(false); // Nao tenta fechar o socket
-                   showStatus('Conexão Perdida com o Servidor.', 'error');
-              } else {
-                   ws = null;
-              }
-          };
+        // Tratamento de Erros: Erro de conexao
+        ws.onerror = (error) => {
+          console.error("Erro no WebSocket:", error);
+          showStatus(`Erro ao conectar: Verifique o console.`, 'error');
+          disconnect(false); // Nao tenta fechar o socket que ja falhou
+        };
+
+        // Tratamento de Erros: Conexao fechada
+        ws.onclose = (event) => {
+          console.log(`Conexao fechada. Codigo: ${event.code}, Razao: ${event.reason}`);
+          if (document.getElementById('chatScreen').classList.contains('active')) {
+            disconnect(false); // Nao tenta fechar o socket
+            showStatus('Conexão Perdida com o Servidor.', 'error');
+          } else {
+            ws = null;
+          }
+        };
 
       } catch (error) {
-          console.error("Erro ao tentar criar WebSocket:", error);
-          showStatus('Erro: Verifique o endereço do servidor.', 'error');
-          ws = null;
+        console.error("Erro ao tentar criar WebSocket:", error);
+        showStatus('Erro: Verifique o endereço do servidor.', 'error');
+        ws = null;
       }
     });
 
@@ -559,48 +572,48 @@
     function sendMessage() {
       const input = document.getElementById('messageInput');
       const text = input.value.trim();
-      
+
       if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
-      
+
       // 2. Envia mensagem de chat (o servidor ira adicionar o nome)
       const messageObject = {
-          type: 'chat', 
-          text: text
+        type: 'chat',
+        text: text
       };
-      
+
       // Envia a mensagem para o servidor
       ws.send(JSON.stringify(messageObject));
 
       // Adiciona a mensagem localmente
-      addMessage(currentUsername, text, true); 
-      
+      addMessage(currentUsername, text, true);
+
       input.value = '';
     }
-    
+
     // Funcao de desconexao (opcionalmente fecha o socket)
     function disconnect(closeSocket = true) {
       if (ws && closeSocket && ws.readyState === WebSocket.OPEN) {
-          // Fecha a conexao de forma limpa
-          ws.close(1000, "Desconexao solicitada pelo usuario");
+        // Fecha a conexao de forma limpa
+        ws.close(1000, "Desconexao solicitada pelo usuario");
       }
-      ws = null; 
+      ws = null;
       currentUsername = '';
       messages = [];
-      
+
       // Limpa as mensagens
       const messagesContainer = document.getElementById('messagesContainer');
       messagesContainer.innerHTML = '<div class="empty-state">Nenhuma mensagem ainda. Seja o primeiro a enviar uma mensagem!</div>';
-      
+
       // Limpa o formulario
       document.getElementById('usernameInput').value = '';
       document.getElementById('statusMessage').className = 'status-message';
-      
+
       showScreen('loginScreen');
     }
 
 
     document.getElementById('sendButton').addEventListener('click', sendMessage);
-    
+
     document.getElementById('messageInput').addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
         sendMessage();
@@ -612,71 +625,10 @@
 
     // Inicializa a porta padrao para 9000
     document.getElementById('portInput').value = '9000';
-    
-    // Initialize Element SDK
-    if (window.elementSdk) {
-      window.elementSdk.init({
-        defaultConfig: defaultConfig,
-        onConfigChange: async (newConfig) => {
-          config = { ...newConfig };
-          updateUI();
-        },
-        mapToCapabilities: (config) => ({
-          recolorables: [
-            {
-              get: () => config.primary_color || defaultConfig.primary_color,
-              set: (value) => {
-                config.primary_color = value;
-                window.elementSdk.setConfig({ primary_color: value });
-              }
-            },
-            {
-              get: () => config.secondary_color || defaultConfig.secondary_color,
-              set: (value) => {
-                config.secondary_color = value;
-                window.elementSdk.setConfig({ secondary_color: value });
-              }
-            },
-            {
-              get: () => config.background_color || defaultConfig.background_color,
-              set: (value) => {
-                config.background_color = value;
-                window.elementSdk.setConfig({ background_color: value });
-              }
-            },
-            {
-              get: () => config.text_color || defaultConfig.text_color,
-              set: (value) => {
-                config.text_color = value;
-                window.elementSdk.setConfig({ text_color: value });
-              }
-            },
-            {
-              get: () => config.surface_color || defaultConfig.surface_color,
-              set: (value) => {
-                config.surface_color = value;
-                window.elementSdk.setConfig({ surface_color: value });
-              }
-            }
-          ],
-          borderables: [],
-          fontEditable: undefined,
-          fontSizeable: undefined
-        }),
-        mapToEditPanelValues: (config) => new Map([
-          ['app_title', config.app_title || defaultConfig.app_title],
-          ['login_title', config.login_title || defaultConfig.login_title],
-          ['connect_button_text', config.connect_button_text || defaultConfig.connect_button_text],
-          ['chat_title', config.chat_title || defaultConfig.chat_title],
-          ['message_placeholder', config.message_placeholder || defaultConfig.message_placeholder],
-          ['send_button_text', config.send_button_text || defaultConfig.send_button_text],
-          ['disconnect_button_text', config.disconnect_button_text || defaultConfig.disconnect_button_text]
-        ])
-      });
-    }
 
     // Initial UI update
     updateUI();
   </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'99a8609dd5ee4fb4',t:'MTc2MjQ3MTgxMy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
+
 </html>

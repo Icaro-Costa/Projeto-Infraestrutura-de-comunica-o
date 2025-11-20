@@ -95,7 +95,8 @@ async def iniciar_servidor():
 
     try:
         # Use o 'handler' que tem dois argumentos (websocket, path)
-        async with websockets.serve(handler, HOST, PORTA):
+        # origins=None permite conexoes de qualquer origem (necessario para rodar html localmente)
+        async with websockets.serve(handler, HOST, PORTA, origins=None):
             print(f"[ESCUTANDO] Servidor WebSocket escutando em ws://{HOST}:{PORTA}...")
             await asyncio.Future()
     except OSError as e:
