@@ -1,4 +1,3 @@
-# Importa bibliotecas assincronas e de websocket
 import asyncio
 import websockets
 import json
@@ -91,7 +90,7 @@ async def handler(websocket):
 # Funcao principal do servidor
 async def iniciar_servidor():
     HOST = '127.0.0.1'
-    PORTA = 9000  # PORTA ALTERADA
+    PORTA = 9000
 
     try:
         # Use o 'handler' que tem dois argumentos (websocket, path)
